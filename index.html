@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Assignment</title>
+    <style>
+        :root {
+            --background-color: #121212;
+            --card-background: #1a1a1a;
+            --primary-color: #ff7b54;
+            --primary-hover: #e86d4a;
+            --text-color: #ffffff;
+            --secondary-text: #bbbbbb;
+            --border-color: #333333;
+            --input-background: #1e1e1e;
+            --error-color: #d32f2f;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            text-shadow: 0 2px 10px rgba(255, 123, 84, 0.7);
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--text-color);
+        }
+
+        .container {
+            padding: 20px;
+            background: var(--card-background);
+            border-radius: 12px;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.5);
+            margin: 20px auto;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        input, select {
+            width: 92%;
+            padding: 10px;
+            margin: 8px 0;
+            background: var(--input-background);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease-in-out;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 10px var(--primary-color);
+        }
+
+        button {
+            width: 100%;
+            padding: 10px;
+            background: var(--primary-color);
+            color: var(--text-color);
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.2s ease;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(255, 123, 84, 0.5);
+        }
+
+        button:active {
+            transform: translateY(0);
+            box-shadow: none;
+        }
+
+        button:disabled {
+            background: var(--border-color);
+            cursor: not-allowed;
+        }
+
+        .teammate {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .teammate span {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--secondary-text);
+        }
+
+        @media (max-width: 500px) {
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            h2 {
+                font-size: 1.2rem;
+            }
+
+            input, select, button {
+                font-size: 0.85rem;
+                padding: 8px;
+            }
+
+            .container {
+                padding: 15px;
+                margin: 10px auto;
+                width: 80%;
+            }
+
+            .teammate span {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Game Assignment</h1>
+    <div class="container">
+        <input type="text" id="teamNameInput" placeholder="Enter Team Name">
+        <button id="fetchTeam">Fetch Team</button>
+    </div>
+    <div class="container" id="teamDetails" style="display:none;">
+        <h2>Team Members</h2>
+        <div id="teammates"></div>
+        <button id="submitAssignments" disabled>Submit Assignments</button>
+    </div>
+    <div class="container" id="assignments" style="display:none;">
+        <h2>Game Assignments</h2>
+        <div id="assignedGames"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.9.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.9.1/firebase-firestore.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAAeoU_OPX3KdsAZ91xU48lAc7s4THG_Vc",
+            authDomain: "competition-registration-2024.firebaseapp.com",
+            projectId: "competition-registration-2024",
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        const teamNameInput = document.getElementById("teamNameInput");
+        const fetchTeamButton = document.getElementById("fetchTeam");
+        const teamDetails = document.getElementById("teamDetails");
+        const teammatesContainer = document.getElementById("teammates");
+        const submitButton = document.getElementById("submitAssignments");
+        const assignments = document.getElementById("assignments");
+        const assignedGamesContainer = document.getElementById("assignedGames");
+
+        let teammates = [];
+        let assignedGames = {};
+        const games = ["Mcq", "Puzzle", "Painting", "Chain block", "Coding"];
+
+        async function fetchTeamData() {
+            const teamName = teamNameInput.value.trim();
+            if (!teamName) {
+                alert("Please enter a team name.");
+                return;
+            }
+
+            const teamDoc = await db.collection("teams").doc(teamName).get();
+            if (teamDoc.exists) {
+                const data = teamDoc.data();
+                teammates = data.teammates || [];
+                assignedGames = data.gameAssignments || {};
+
+                if (Object.keys(assignedGames).length > 0) {
+                    displayAssignedGames(assignedGames);
+                    alert("Games have already been assigned for this team.");
+                    return;
+                }
+
+                displayTeammates(teammates);
+            } else {
+                alert("Team not found.");
+                teamDetails.style.display = "none";
+                assignments.style.display = "none";
+            }
+        }
+
+        function displayTeammates(teammates) {
+            teammatesContainer.innerHTML = "";
+            teammates.forEach((teammate, index) => {
+                const teammateDiv = document.createElement("div");
+                teammateDiv.className = "teammate";
+
+                teammateDiv.innerHTML = `
+                    <span>${teammate}</span>
+                    <select id="gameSelect-${index}" onchange="assignGame(${index}, '${teammate}')">
+                        <option value="">-- Select Game --</option>
+                        ${games.map((game) => `<option value="${game}">${game}</option>`).join("")}
+                    </select>
+                `;
+                teammatesContainer.appendChild(teammateDiv);
+            });
+
+            teamDetails.style.display = "block";
+        }
+
+        function displayAssignedGames(assignedGames) {
+            assignedGamesContainer.innerHTML = "";
+            for (const [teammate, game] of Object.entries(assignedGames)) {
+                const assignment = document.createElement("p");
+                assignment.textContent = `${teammate}: ${game}`;
+                assignedGamesContainer.appendChild(assignment);
+            }
+            assignments.style.display = "block";
+        }
+
+        window.assignGame = function (index, teammate) {
+            const gameSelect = document.getElementById(`gameSelect-${index}`);
+            const selectedGame = gameSelect.value;
+
+            if (Object.values(assignedGames).includes(selectedGame)) {
+                alert("This game is already assigned to another teammate!");
+                gameSelect.value = "";
+                return;
+            }
+
+            assignedGames[teammate] = selectedGame;
+            const allAssigned = Object.keys(assignedGames).length === teammates.length &&
+                                !Object.values(assignedGames).includes("");
+            submitButton.disabled = !allAssigned;
+        };
+
+        async function submitAssignments() {
+            const teamName = teamNameInput.value.trim();
+            if (!teamName) return;
+
+            await db.collection("gameSelections").doc(teamName).set({
+                assignedGames: assignedGames,
+            });
+
+            alert("Games assigned successfully!");
+            displayAssignedGames(assignedGames);
+            teamDetails.style.display = "none";
+        }
+
+        fetchTeamButton.addEventListener("click", fetchTeamData);
+        submitButton.addEventListener("click", submitAssignments);
+    </script>
+</body>
+</html>
