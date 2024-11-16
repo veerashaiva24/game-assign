@@ -187,24 +187,35 @@
                 return;
             }
 
+            // Step 1: Check if team exists in 'teams' collection
             const teamDoc = await db.collection("teams").doc(teamName).get();
-            if (teamDoc.exists) {
-                const data = teamDoc.data();
-                teammates = data.teammates || [];
-                assignedGames = data.gameAssignments || {};
-
-                if (Object.keys(assignedGames).length > 0) {
-                    displayAssignedGames(assignedGames);
-                    alert("Games have already been assigned for this team.");
-                    return;
-                }
-
-                displayTeammates(teammates);
-            } else {
+            if (!teamDoc.exists) {
                 alert("Team not found.");
                 teamDetails.style.display = "none";
                 assignments.style.display = "none";
+                return;
             }
+
+            // Step 2: Check if games are already assigned in 'gameSelections' collection
+            const gameSelectionDoc = await db.collection("gameSelections").doc(teamName).get();
+            if (gameSelectionDoc.exists) {
+                assignedGames = gameSelectionDoc.data().assignedGames || {};
+                if (Object.keys(assignedGames).length > 0) {
+                    // If games are already assigned, display them and exit
+                    displayAssignedGames(assignedGames);
+                    alert("Games have already been assigned for this team.");
+                    teamDetails.style.display = "none";
+                    assignments.style.display = "block";
+                    return;
+                }
+            }
+
+            // Step 3: If no games assigned, fetch teammates from 'teams' collection
+            const data = teamDoc.data();
+            teammates = data.teammates || [];
+            displayTeammates(teammates);
+            teamDetails.style.display = "block";  // Show team member selection form
+            assignments.style.display = "none";  // Hide assigned games
         }
 
         function displayTeammates(teammates) {
@@ -222,8 +233,6 @@
                 `;
                 teammatesContainer.appendChild(teammateDiv);
             });
-
-            teamDetails.style.display = "block";
         }
 
         function displayAssignedGames(assignedGames) {
@@ -233,13 +242,14 @@
                 assignment.textContent = `${teammate}: ${game}`;
                 assignedGamesContainer.appendChild(assignment);
             }
-            assignments.style.display = "block";
+            assignments.style.display = "block";  // Show assigned games
         }
 
         window.assignGame = function (index, teammate) {
             const gameSelect = document.getElementById(`gameSelect-${index}`);
             const selectedGame = gameSelect.value;
 
+            // Prevent re-selection of already assigned games
             if (Object.values(assignedGames).includes(selectedGame)) {
                 alert("This game is already assigned to another teammate!");
                 gameSelect.value = "";
@@ -249,20 +259,21 @@
             assignedGames[teammate] = selectedGame;
             const allAssigned = Object.keys(assignedGames).length === teammates.length &&
                                 !Object.values(assignedGames).includes("");
-            submitButton.disabled = !allAssigned;
+            submitButton.disabled = !allAssigned;  // Enable submit button only if all games are assigned
         };
 
         async function submitAssignments() {
             const teamName = teamNameInput.value.trim();
             if (!teamName) return;
 
+            // Step 4: Store the assigned games in 'gameSelections' collection
             await db.collection("gameSelections").doc(teamName).set({
                 assignedGames: assignedGames,
             });
 
             alert("Games assigned successfully!");
             displayAssignedGames(assignedGames);
-            teamDetails.style.display = "none";
+            teamDetails.style.display = "none";  // Hide the team selection form
         }
 
         fetchTeamButton.addEventListener("click", fetchTeamData);
